@@ -94,8 +94,8 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log("A user disconnected:", socket.id);
-    if (waitingPlayer && waitingPlayer.id === socket.id) {
-      waitingPlayer = null;
+    if (waitingPlayers && waitingPlayers.id === socket.id) {
+      waitingPlayers = [];
     }
     for (const [gameId, game] of Object.entries(games)) {
       if (game.players[socket.id]) {
