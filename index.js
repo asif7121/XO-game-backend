@@ -10,41 +10,48 @@ const io = new Server(server);
 const port = 3000;
 
 let games = {};
-let waitingPlayer = null;
+let waitingPlayers = [];
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
-  if (waitingPlayer) {
+  // Add the new player to the waitingPlayers queue
+  waitingPlayers.push(socket);
+
+  if (waitingPlayers.length >= 2) {
+    // If there are at least two players waiting, start a new game
+    const player1 = waitingPlayers.shift();
+    const player2 = waitingPlayers.shift();
+
     const gameId = uuidv4();
     games[gameId] = {
-      players: { [waitingPlayer.id]: "X", [socket.id]: "O" },
+      players: { [player1.id]: "X", [player2.id]: "O" },
       board: Array(9).fill(null),
-      currentPlayer: waitingPlayer.id,
+      currentPlayer: player1.id,
       moves: 0,
     };
-    waitingPlayer.emit("game_start", {
-      gameId,
-      symbol: "X",
-      opponent: socket.id,
-    });
-    socket.emit("game_start", {
-      gameId,
-      symbol: "O",
-      opponent: waitingPlayer.id,
-    });
-    console.log(
-      `Game started between ${waitingPlayer.id} (X) and ${socket.id} (O)\n GameId: ${gameId}`
-    );
-    waitingPlayer = null;
+
+    player1.emit("game_start", { gameId, symbol: "X", opponent: player2.id });
+    player2.emit("game_start", { gameId, symbol: "O", opponent: player1.id });
+
+    console.log(`Game started between ${player1.id} (X) and ${player2.id} (O)`);
   } else {
-    waitingPlayer = socket;
     socket.emit("waiting", "Waiting for an opponent...");
     console.log(`Player ${socket.id} is waiting for an opponent...`);
   }
 
   socket.on("make_move", ({ gameId, index }) => {
-    const game = games[gameId];
+    const game = games[ gameId ];
+     if (!game) {
+       socket.emit("error", {
+         message: "Invalid gameId, Wait for an opponent to join the game",
+       });
+       console.log(
+         `Player ${socket.id} attempted to make a move with an invalid gameId`
+       );
+       return;
+     }
+
     if (
       game &&
       game.board[index] === null &&
